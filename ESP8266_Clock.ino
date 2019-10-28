@@ -9,6 +9,9 @@ U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/ 23, /* data=*/ 19,
 
 #define nextButton 16
 #define backButton 18
+#define noOfMainMenueItems 8
+#define alarmRingTimeInSeconds 30
+#define screenSleepTimeInSeconds 60
 
 int page=1;
 int selMainMenueItm=1; int selSetTimeItm=1;int selSetAlarmItm=1; int selSetAlarmXItm=1;
@@ -19,6 +22,7 @@ int format=12;
 int X=1;
 int alarmState=LOW,interval=200,counter=1;
 unsigned long previousMillis = 0,currentMillis=0,starttime=0,endtime=0;  
+unsigned long currentMillis1=0,starttime1=0,endtime1=millis()+((1000*screenSleepTimeInSeconds)-1);
  
 struct alarmVar
 {
@@ -32,72 +36,94 @@ void setup() {
    Serial.begin(9600);
    pinMode(16, INPUT_PULLUP); 
    pinMode(18, INPUT_PULLUP); 
-    pinMode(15, OUTPUT);                                    
+    pinMode(15, OUTPUT);  
+     pinMode(2, OUTPUT);                                  
    u8g2.begin(); 
    Wire.begin();
 
-    
+  u8g2.setFontMode(1);
+
    
-    //rtc.set(0, 42, 16, 6, 2, 5, 15);
+   //rtc.set(0, 42, 16, 1, 15, 9, 19);  
+   //RTCLib::set(byte second, byte minute, byte hour, byte dayOfWeek (sunday -1), byte dayOfMonth, byte month(1-jan), byte year)
     //AVar[1].status_=1; AVar[1].hr=16; AVar[1].minit=42; AVar[1].seco=5;
  }
 
 void loop() {
 
-   
+      displayWakeSleep();
      selector();
      ringAlarm();
+    
      
     u8g2.firstPage();
   do { 
       switch(page)
       { 
-       case 1:clockFace(); break;
-       case 2:  mainMenue(); break;
+       case 1:  clockFace(); break;
+       case 2:  if(selMainMenueItm<=4)
+                mainMenue(); 
+                else
+                mainMenue2();
+                break;
        case 21: setTime(); break;
        case 22: setAlarm(); break;
        case 221: setAlarmX(); break;
        case 222: setAlarmX(); break;
        case 223: setAlarmX(); break;
+       case   3: dateAndTempPage(); break;
       }
        
    } while ( u8g2.nextPage() );
 }
 
+
 void mainMenue()
 {
-  
-  switch(selMainMenueItm)
- {
-  case 1:drawMainMenue(0,1,1,1,2); break;
-  case 2:drawMainMenue(1,0,1,1,17); break;
-  case 3:drawMainMenue(1,1,0,1,32); break;
-  case 4:drawMainMenue(1,1,1,0,47); break;
- }
-
-}
-int drawMainMenue(int b1,int b2,int b3,int b4,int boxYCoordinate)
-{
+  u8g2.setDrawColor(1);
+    switch(selMainMenueItm)
+   {
+    case 1: u8g2.drawBox(0,2,128,13); break;
+    case 2: u8g2.drawBox(0,17,128,13); break;
+    case 3: u8g2.drawBox(0,32,128,13); break;
+    case 4: u8g2.drawBox(0,47,128,13); break;
+    case 5: mainMenue2();
+   }
  
- 
-    u8g2.setFont(u8g2_font_9x15_mf);
-    u8g2.setFontMode(1);
-    u8g2.setDrawColor(1);
-    u8g2.drawBox(0,boxYCoordinate,128,13);
-  
-    u8g2.setDrawColor(b1);
-    u8g2.drawStr(0,13,"BACK");
-   
-    u8g2.setDrawColor(b2);
-    u8g2.drawStr(0,28,"SET TIME");
-  
-    u8g2.setDrawColor(b3);
-    u8g2.drawStr(0,43,"SET ALARM");
+    u8g2.setDrawColor(2);
     
-    u8g2.setDrawColor(b4);
+    u8g2.setFont(u8g2_font_9x15_mf);
+    u8g2.drawStr(0,13,"BACK");
+    u8g2.drawStr(0,28,"SET TIME");
+    u8g2.drawStr(0,43,"SET ALARM");
     u8g2.drawStr(0,58,"SET FACE");
     
+    u8g2.setDrawColor(1);
+   
+   }
 
+   void mainMenue2()
+{
+  u8g2.setDrawColor(1);
+    switch(selMainMenueItm)
+   {
+    case 5: u8g2.drawBox(0,2,128,13); break;
+    case 6: u8g2.drawBox(0,17,128,13); break;
+    case 7: u8g2.drawBox(0,32,128,13); break;
+    case 8: u8g2.drawBox(0,47,128,13); break;
+    case 9: mainMenue();
+   }
+ 
+    u8g2.setDrawColor(2);
+    
+    u8g2.setFont(u8g2_font_9x15_mf);
+    u8g2.drawStr(0,13,"TIMER");
+    u8g2.drawStr(0,28,"WALLPAPER");
+    u8g2.drawStr(0,43,"TEAST");
+    u8g2.drawStr(0,58,"TEAST 2");
+    
+    u8g2.setDrawColor(1);
+   
    }
 
    void clockFace()
@@ -135,7 +161,7 @@ int drawMainMenue(int b1,int b2,int b3,int b4,int boxYCoordinate)
 //*****************************converting read time from rtc to a string format HH:MM*********************************
       char TIME[6];
 
-      Serial.println(tHR);
+     
       if(tHR>=10)
       {
         int tHR1,tHR2;
@@ -334,6 +360,8 @@ int drawMainMenue(int b1,int b2,int b3,int b4,int boxYCoordinate)
         bakBtnPressStat=0;
     }  
 
+
+
 void ringAlarm()
 {
   if(page!=21)
@@ -349,7 +377,7 @@ void ringAlarm()
       if((hr==AVar[i].hr)&&(minit==AVar[i].minit)&&(seco==AVar[i].seco))
       {
         starttime=millis();
-        endtime=starttime+((1000*30)-1);
+        endtime=starttime+((1000*alarmRingTimeInSeconds)-1);
        
       }
     }
@@ -393,8 +421,38 @@ void ringAlarm()
   }
 }
 
+void displayWakeSleep()
+{
+   button1press();
+   button2press();
+   
+   if(bakBtnPressStat==1||nxtBtnPressStat==1)
+   { 
+    u8g2.setPowerSave(0);
+    endtime1=millis()+((1000*screenSleepTimeInSeconds)-1); //5seconds 
+   }
+   else
+   currentMillis1=millis();
+
+   if(currentMillis1<endtime1)
+    {
+      u8g2.setPowerSave(0);
+      digitalWrite(2,LOW);
+    }
+    else
+    {
+      u8g2.setPowerSave(1);
+      digitalWrite(2,HIGH);
+    }
+
+    
+    
+ 
+}
+
 void selector()
 {
+ //////////////////////////////////////page 2 MAIN MENUE starts //////////////////////////////////////
  if(page==2)
  {
        button1press();
@@ -402,7 +460,7 @@ void selector()
        if(nxtBtnPressStat)
        {
         selMainMenueItm++;
-        if( selMainMenueItm > 4)
+        if( selMainMenueItm > noOfMainMenueItems)
         selMainMenueItm=1;
        }
  
@@ -426,14 +484,20 @@ void selector()
      
        }
 }
+ //////////////////////////////////////page 2 MAIN MENUE ends //////////////////////////////////////
 
+ //////////////////////////////////////page 1 CLOCK FACE starts //////////////////////////////////////
   else if(page==1)
    {
      button1press();
     if(nxtBtnPressStat==1)
-     { page=2;nxtBtnPressStat=0;}
+     { page=3;nxtBtnPressStat=0;}
    }
 
+  //////////////////////////////////////page 1 CLOCK FACE ends //////////////////////////////////////  
+  
+  
+  //////////////////////////////////////page 21 SET TIME starts //////////////////////////////////////
    else if(page==21)
    {
       button1press();
@@ -477,7 +541,8 @@ void selector()
                   
            case 4: button2press();
                 if(bakBtnPressStat==1)
-                  {  rtc.set(seco,minit,hr, 6, 2, 5, 15);
+                  { rtc.refresh(); 
+                    rtc.set(seco,minit,hr,rtc.dayOfWeek(),rtc.day(),rtc.month(),rtc.year());
                      page=2;nxtBtnPressStat=0;
                     }break;                 
         case 5: button2press();
@@ -485,12 +550,13 @@ void selector()
                {page=2;bakBtnPressStat=0;} break;
       }
    }
+//////////////////////////////////////page 21 SET TIME ends //////////////////////////////////////
 
+
+//////////////////////////////////////page 22 SET ALARM starts //////////////////////////////////////
    else if(page==22)
    {
-         
-         
-         button1press();
+      button1press();
          if(nxtBtnPressStat==1)
          {
           selSetAlarmItm++;
@@ -527,8 +593,9 @@ void selector()
                   break;
         }
    }
+//////////////////////////////////////page 221,222,223 SET ALARM 1,2&3 starts //////////////////////////////////////
 
-  else if(page==221||page==222||page==223)
+ else if(page==221||page==222||page==223)
   {
       
        
@@ -584,6 +651,53 @@ void selector()
                     }break;
       }
   }
+//////////////////////////////////////page 221,222,223 SET ALARM 1,2&3 ends //////////////////////////////////////
 
+
+ else if(page==3)
+ {
+       button1press();
+       button2press();
+       
+    if(nxtBtnPressStat==1)
+     { page=2;nxtBtnPressStat=0;} 
+    
+
+    else if(bakBtnPressStat==1)
+     { page=1;nxtBtnPressStat=0;} 
+    
+  
+ }
+
+ 
+}//end of selector()
+
+
+void dateAndTempPage()
+{
+   int monthWidth=0;
+  
+   u8g2.setFontPosTop();
+   
+   char *dowItems[]={"SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THRUSDAY","FRIDAY","SATURDAY"};
+   char *monthItems[]={"JANUARY","FEBRUARY","MARCH","APRIL","MAY","JUNE","JULY","AUGUST","SEPTEMBER","OCTOBER","NOVEMBER","DECEMBER"};
+    
+   
+    u8g2.setFont(u8g2_font_freedoomr10_mu);
+    u8g2.setCursor(56,0); u8g2.print(dowItems[rtc.dayOfWeek()-1]);
+    u8g2.setCursor(40,13); u8g2.print(rtc.day());
+    u8g2.setCursor(45,28); u8g2.print(monthItems[rtc.month()-1]);
+    u8g2.setCursor(1,41); u8g2.print(2000+rtc.year());
+
+
+    u8g2.setFont(u8g2_font_5x8_mf);
+    u8g2.setCursor(0,2); u8g2.print("TODAY is A ");
+    u8g2.setCursor(3,15); u8g2.print("We are ");
+    u8g2.setCursor(59,15); u8g2.print(" days into the");
+    u8g2.setCursor(2,28); u8g2.print("Month of ");
+    u8g2.setCursor(34,44); u8g2.print("is the Ongoing Year ");
+     
+     u8g2.setFontPosBaseline();
 }
+
   
