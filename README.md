@@ -8,4 +8,4 @@ fearures <br>
 
 implemented using u8g2 library.<br>
 ![Image of device](images/fullshot.jpg)
-
+![Image of device](images/fullshot2.gif =200x200)
